@@ -1,38 +1,27 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import { AppError } from '../utils/AppError.js';
+import AppError from '../utils/AppError.js';
 
-export const authMiddleware = async (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader) {
-      throw AppError.unauthorized('Authorization token is required');
+    let token;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
     }
 
-    const token = authHeader.startsWith('Bearer ')
-      ? authHeader.split(' ')[1]
-      : null;
+    if (!token) return next(AppError.unauthorized('Please log in'));
 
-    if (!token) {
-      throw AppError.unauthorized('Invalid Authorization header format');
-    }
-
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-
-    const user = await User.findById(payload.id);
-
-    if (!user || user.deleted) {
-      throw AppError.unauthorized('User not authorized');
-    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded._id);
+    
+    if (!user || user.deleted) return next(AppError.unauthorized('User not found or deactivated'));
 
     req.user = user;
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return next(AppError.unauthorized('Invalid or expired token'));
-    }
-
-    next(error);
+    next(AppError.unauthorized('Invalid token'));
   }
 };
+
+// This MUST be export default to match your user.routes.js
+export default authMiddleware;

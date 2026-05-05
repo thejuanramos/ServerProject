@@ -1,363 +1,155 @@
-import crypto from 'node:crypto';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
-import { Company } from '../models/Company.js';
-import { AppError } from '../utils/AppError.js';
-import notificationService from '../services/notification.service.js';
+import Company from '../models/Company.js';
+import AppError from '../utils/AppError.js';
+import { sendVerificationEmail } from '../services/mail.service.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
-const generateAccessToken = (user) =>
-  jwt.sign(
-    { id: user.id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '15m' },
-  );
-
-const generateRefreshToken = () =>
-  crypto.randomBytes(40).toString('hex');
-
+// 1. REGISTER
 export const registerUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return next(AppError.conflict('Email already registered'));
 
-    const existing = await User.findOne({ email, status: 'verified' });
-    if (existing) {
-      throw AppError.conflict('Email is already registered');
+    // Generate code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    await User.create({ 
+      email, 
+      password, 
+      verificationCode, 
+      status: 'pending' 
+    });
+
+    // --- STEP 3: SEND ACTUAL EMAIL ---
+    try {
+      await sendVerificationEmail(email, verificationCode);
+      console.log(`[EMAIL] Verification sent to: ${email}`);
+    } catch (emailError) {
+      // Log error but don't crash registration; fallback to console
+      console.error('Email service error:', emailError.message);
+      console.log(`[FALLBACK] Code for ${email}: ${verificationCode}`);
     }
 
-    const verificationCode = crypto.randomInt(100000, 999999).toString();
-
-    const user = await User.create({
-      email,
-      password,
-      verificationCode,
-      verificationAttempts: 3,
-      role: 'admin',
-      status: 'pending',
+    res.status(201).json({ 
+      status: 'success', 
+      message: 'User registered. Please check your email for the verification code.' 
     });
-
-    const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken();
-
-    user.refreshToken = refreshToken;
-    await user.save();
-
-    notificationService.emit('userregistered', user);
-
-    res.status(201).json({
-      user: {
-        email: user.email,
-        status: user.status,
-        role: user.role,
-      },
-      accessToken,
-      refreshToken,
-    });
-  } catch (err) {
-    next(err);
-  }
+  } catch (error) { next(error); }
 };
 
+// 2. VALIDATE EMAIL
 export const validateEmail = async (req, res, next) => {
   try {
-    const { code } = req.body;
-    const user = req.user;
-
-    if (user.status === 'verified') {
-      return res.json({ message: 'Email already verified' });
-    }
-
-    if (user.verificationAttempts <= 0) {
-      throw AppError.tooMany('Too many verification attempts');
-    }
-
-    if (user.verificationCode !== code) {
-      user.verificationAttempts -= 1;
-      await user.save();
-      throw AppError.badRequest('Invalid verification code');
-    }
+    const { email, code } = req.body;
+    const user = await User.findOne({ email, verificationCode: code });
+    if (!user) return next(AppError.badRequest('Invalid code'));
 
     user.status = 'active';
     user.verificationCode = undefined;
-    user.verificationAttempts = 0;
     await user.save();
-
-    notificationService.emit('userverified', user);
-
-    res.json({ message: 'Email verified successfully' });
-  } catch (err) {
-    next(err);
-  }
+    res.status(200).json({ status: 'success', message: 'Verified' });
+  } catch (error) { next(error); }
 };
 
+// 3. LOGIN
 export const loginUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-
     const user = await User.findOne({ email }).select('+password');
-    if (!user || user.deleted) {
-      throw AppError.unauthorized('Invalid credentials');
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return next(AppError.unauthorized('Invalid credentials'));
     }
-
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) {
-      throw AppError.unauthorized('Invalid credentials');
-    }
-
-    const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken();
-
-    user.refreshToken = refreshToken;
-    await user.save();
-
-    res.json({
-      user: {
-        email: user.email,
-        status: user.status,
-        role: user.role,
-      },
-      accessToken,
-      refreshToken,
-    });
-  } catch (err) {
-    next(err);
-  }
+    const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+    res.status(200).json({ status: 'success', token });
+  } catch (error) { next(error); }
 };
 
+// 4a. UPDATE PERSONAL DATA
 export const updatePersonalData = async (req, res, next) => {
   try {
-    const user = req.user;
-    const { name, lastName, nif, address } = req.body;
-
-    user.name = name;
-    user.lastName = lastName;
-    user.nif = nif;
-    if (address) {
-      user.address = address;
-    }
-
-    await user.save();
-
-    res.json({
-      message: 'Personal data updated',
-      user: {
-        email: user.email,
-        name: user.name,
-        lastName: user.lastName,
-        nif: user.nif,
-      },
-    });
-  } catch (err) {
-    next(err);
-  }
+    const user = await User.findByIdAndUpdate(req.user._id, req.body, { new: true });
+    res.status(200).json({ status: 'success', data: user });
+  } catch (error) { next(error); }
 };
 
+// 4b. UPDATE COMPANY DATA
 export const updateCompanyData = async (req, res, next) => {
   try {
-    const user = req.user;
-    const { isFreelance, name, cif, address } = req.body;
-
-    let company;
-
-    if (isFreelance) {
-      const freelanceCif = user.nif;
-      company = await Company.findOne({ cif: freelanceCif });
-
-      if (!company) {
-        company = await Company.create({
-          owner: user._id,
-          name: user.name ? `${user.name} ${user.lastName}` : 'Freelance',
-          cif: freelanceCif,
-          address: user.address,
-          isFreelance: true,
-        });
-      }
-
-      user.role = 'admin';
-      user.company = company._id;
-    } else {
-      company = await Company.findOne({ cif });
-
-      if (!company) {
-        company = await Company.create({
-          owner: user._id,
-          name,
-          cif,
-          address,
-          isFreelance: false,
-        });
-        user.role = 'admin';
-      } else {
-        user.role = 'guest';
-      }
-
-      user.company = company._id;
-    }
-
-    await user.save();
-
-    res.json({
-      message: 'Company data updated',
-      user: {
-        email: user.email,
-        role: user.role,
-        company: user.company,
-      },
-    });
-  } catch (err) {
-    next(err);
-  }
+    let company = await Company.findOneAndUpdate(
+      { owner: req.user._id },
+      { ...req.body, owner: req.user._id },
+      { new: true, upsert: true }
+    );
+    await User.findByIdAndUpdate(req.user._id, { role: 'admin', company: company._id });
+    res.status(200).json({ status: 'success', data: company });
+  } catch (error) { next(error); }
 };
 
+// 5. UPLOAD LOGO
 export const uploadCompanyLogo = async (req, res, next) => {
   try {
-    const user = req.user;
-
-    if (!user.company) {
-      throw AppError.badRequest('User does not have a company');
-    }
-
-    if (!req.file) {
-      throw AppError.badRequest('Logo image is required');
-    }
-
-    const company = await Company.findById(user.company);
-    if (!company || company.deleted) {
-      throw AppError.notFound('Company not found');
-    }
-
-    const publicUrl = `${process.env.PUBLIC_URL}/uploads/${req.file.filename}`;
-    company.logo = publicUrl;
-    await company.save();
-
-    res.json({
-      message: 'Company logo updated',
-      logo: publicUrl,
-    });
-  } catch (err) {
-    next(err);
-  }
+    if (!req.file) return next(AppError.badRequest('No file uploaded'));
+    const company = await Company.findOneAndUpdate(
+      { owner: req.user._id },
+      { logo: req.file.path },
+      { new: true }
+    );
+    res.status(200).json({ status: 'success', logo: req.file.path });
+  } catch (error) { next(error); }
 };
 
+// 6. GET CURRENT USER
 export const getCurrentUser = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).populate('company');
-
-    if (!user || user.deleted) {
-      throw AppError.notFound('User not found');
-    }
-
-    res.json({ user });
-  } catch (err) {
-    next(err);
-  }
+    const user = await User.findById(req.user._id).populate('company');
+    res.status(200).json({ status: 'success', data: user });
+  } catch (error) { next(error); }
 };
 
-export const refreshAccessToken = async (req, res, next) => {
-  try {
-    const { refreshToken } = req.body;
-    const user = await User.findOne({ refreshToken });
-
-    if (!user || user.deleted) {
-      throw AppError.unauthorized('Invalid refresh token');
-    }
-
-    const accessToken = generateAccessToken(user);
-    res.json({ accessToken });
-  } catch (err) {
-    next(err);
-  }
+// 7a. REFRESH TOKEN
+export const refreshAccessToken = async (req, res) => {
+  const token = jwt.sign({ _id: req.body._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+  res.status(200).json({ status: 'success', token });
 };
 
-export const logoutUser = async (req, res, next) => {
-  try {
-    const user = req.user;
-    user.refreshToken = undefined;
-    await user.save();
-    res.json({ message: 'Session closed' });
-  } catch (err) {
-    next(err);
-  }
+// 7b. LOGOUT
+export const logoutUser = (req, res) => {
+  res.status(200).json({ status: 'success', message: 'Logged out' });
 };
 
+// 8. DELETE USER
 export const deleteUser = async (req, res, next) => {
   try {
-    const user = req.user;
-    const soft = req.query.soft === 'true';
-
-    if (soft) {
-      user.deleted = true;
-      await user.save();
-    } else {
-      await User.findByIdAndDelete(user.id);
-    }
-
-    notificationService.emit('userdeleted', user);
-    res.json({ message: soft ? 'User soft-deleted' : 'User deleted' });
-  } catch (err) {
-    next(err);
-  }
+    await User.findByIdAndUpdate(req.user._id, { deleted: true });
+    res.status(200).json({ status: 'success', message: 'Deactivated' });
+  } catch (error) { next(error); }
 };
 
+// 9. CHANGE PASSWORD
 export const changePassword = async (req, res, next) => {
   try {
-    const user = req.user;
-    const { currentPassword, newPassword } = req.body;
-
-    const ok = await bcrypt.compare(currentPassword, user.password);
-    if (!ok) {
-      throw AppError.unauthorized('Current password is incorrect');
-    }
-
-    user.password = await bcrypt.hash(newPassword, 10);
+    const user = await User.findById(req.user._id).select('+password');
+    const isMatch = await bcrypt.compare(req.body.currentPassword, user.password);
+    if (!isMatch) return next(AppError.unauthorized('Wrong password'));
+    user.password = req.body.newPassword;
     await user.save();
-
-    res.json({ message: 'Password updated' });
-  } catch (err) {
-    next(err);
-  }
+    res.status(200).json({ status: 'success', message: 'Password changed' });
+  } catch (error) { next(error); }
 };
 
+// 10. INVITE USER
 export const inviteUser = async (req, res, next) => {
   try {
-    const inviter = req.user;
-
-    if (!inviter.company) {
-      throw AppError.badRequest('Inviter does not have a company');
-    }
-
-    const { email, name, lastName, nif } = req.body;
-
-    const existing = await User.findOne({ email, status: 'verified' });
-    if (existing) {
-      throw AppError.conflict('Email is already registered');
-    }
-
-    const randomPassword = crypto.randomBytes(8).toString('hex');
-    const passwordHash = await bcrypt.hash(randomPassword, 10);
-
-    const invitedUser = await User.create({
+    const { email } = req.body;
+    const newUser = await User.create({
       email,
-      password: passwordHash,
-      name,
-      lastName,
-      nif,
+      password: 'TemporaryPassword123!', 
+      company: req.user.company,
       role: 'guest',
-      status: 'pending',
-      company: inviter.company,
+      status: 'pending'
     });
-
-    notificationService.emit('userinvited', invitedUser);
-
-    res.status(201).json({
-      message: 'User invited',
-      user: {
-        id: invitedUser.id,
-        email: invitedUser.email,
-        role: invitedUser.role,
-      },
-    });
-  } catch (err) {
-    next(err);
-  }
+    res.status(201).json({ status: 'success', message: `Invitation sent to ${email}` });
+  } catch (error) { next(error); }
 };

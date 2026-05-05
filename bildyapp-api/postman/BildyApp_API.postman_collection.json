@@ -1,0 +1,543 @@
+{
+  "info": {
+    "_postman_id": "bildyapp-api-collection",
+    "name": "BildyApp API",
+    "description": "Complete API collection for BildyApp — construction delivery note management system.\n\nFlow to follow:\n1. Register → Validate Email → Login (token auto-saved)\n2. Update Profile → Update Company\n3. Create Client (id auto-saved) → Create Project (id auto-saved)\n4. Create Delivery Note (id auto-saved) → Sign → Download PDF",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api", "type": "string" },
+    { "key": "token",     "value": "", "type": "string" },
+    { "key": "clientId",  "value": "", "type": "string" },
+    { "key": "projectId", "value": "", "type": "string" },
+    { "key": "noteId",    "value": "", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth & User",
+      "item": [
+        {
+          "name": "1. Register User",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo@bildyapp.com\",\n  \"password\": \"Password123!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["user", "register"]
+            },
+            "description": "Registers a new user. A 6-digit verification code is printed in the server terminal (in dev mode it is also emailed). Copy that code for the next step."
+          }
+        },
+        {
+          "name": "2. Validate Email",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo@bildyapp.com\",\n  \"code\": \"PASTE_CODE_HERE\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/validation",
+              "host": ["{{baseUrl}}"],
+              "path": ["user", "validation"]
+            },
+            "description": "Verifies the email using the 6-digit code from the server terminal or email inbox."
+          }
+        },
+        {
+          "name": "3. Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "  pm.collectionVariables.set('token', res.token);",
+                  "  console.log('Token saved automatically.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo@bildyapp.com\",\n  \"password\": \"Password123!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["user", "login"]
+            },
+            "description": "Logs in and returns a JWT token. The token is automatically saved to the {{token}} collection variable — all subsequent requests will use it."
+          }
+        },
+        {
+          "name": "4. Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Juan\",\n  \"lastName\": \"Ramos\",\n  \"nif\": \"12345678Z\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["user", "register"]
+            },
+            "description": "Updates the user's personal details. Requires the Bearer token."
+          }
+        },
+        {
+          "name": "5. Update Company",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isFreelance\": false,\n  \"name\": \"BildyApp SL\",\n  \"cif\": \"B12345678\",\n  \"address\": {\n    \"street\": \"Calle Gran Via\",\n    \"number\": \"42\",\n    \"postal\": \"28013\",\n    \"city\": \"Madrid\",\n    \"province\": \"Madrid\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/company",
+              "host": ["{{baseUrl}}"],
+              "path": ["user", "company"]
+            },
+            "description": "Creates or updates the company linked to this user. This must be done before creating clients or projects, since they are scoped to a company."
+          }
+        },
+        {
+          "name": "6. Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/user",
+              "host": ["{{baseUrl}}"],
+              "path": ["user"]
+            },
+            "description": "Returns the authenticated user's data with their company populated."
+          }
+        },
+        {
+          "name": "7. Delete User (Soft)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/user",
+              "host": ["{{baseUrl}}"],
+              "path": ["user"]
+            },
+            "description": "Soft-deletes the account. The user is flagged as deleted but not removed from the database. Subsequent requests with this token will return 401."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clients",
+      "item": [
+        {
+          "name": "Create Client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res._id) {",
+                  "  pm.collectionVariables.set('clientId', res._id);",
+                  "  console.log('clientId saved: ' + res._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ACME Construcciones\",\n  \"cif\": \"B87654321\",\n  \"email\": \"acme@construcciones.com\",\n  \"phone\": \"912345678\",\n  \"address\": {\n    \"street\": \"Calle Serrano\",\n    \"number\": \"10\",\n    \"postal\": \"28001\",\n    \"city\": \"Madrid\",\n    \"province\": \"Madrid\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/client",
+              "host": ["{{baseUrl}}"],
+              "path": ["client"]
+            },
+            "description": "Creates a new client scoped to the authenticated user's company. The returned _id is automatically saved to {{clientId}}."
+          }
+        },
+        {
+          "name": "List Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["client"],
+              "query": [
+                { "key": "page",  "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "name",  "value": "", "disabled": true },
+                { "key": "sort",  "value": "createdAt", "disabled": true }
+              ]
+            },
+            "description": "Returns a paginated list of all active clients in the company. Supports ?name= for partial search and ?sort= for ordering."
+          }
+        },
+        {
+          "name": "Get Client by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["client", "{{clientId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Client",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ACME Construcciones Updated\",\n  \"phone\": \"911111111\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/client/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["client", "{{clientId}}"]
+            }
+          }
+        },
+        {
+          "name": "Archive Client (Soft Delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/{{clientId}}?soft=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["client", "{{clientId}}"],
+              "query": [{ "key": "soft", "value": "true" }]
+            },
+            "description": "Soft delete: flags the client as deleted. Use ?soft=false for permanent hard delete."
+          }
+        },
+        {
+          "name": "List Archived Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/archived",
+              "host": ["{{baseUrl}}"],
+              "path": ["client", "archived"]
+            }
+          }
+        },
+        {
+          "name": "Restore Archived Client",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/{{clientId}}/restore",
+              "host": ["{{baseUrl}}"],
+              "path": ["client", "{{clientId}}", "restore"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "Create Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res._id) {",
+                  "  pm.collectionVariables.set('projectId', res._id);",
+                  "  console.log('projectId saved: ' + res._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Reforma Oficina Central\",\n  \"projectCode\": \"PRJ-2025-001\",\n  \"client\": \"{{clientId}}\",\n  \"email\": \"proyecto@acme.com\",\n  \"notes\": \"Reforma completa de la planta 3\",\n  \"address\": {\n    \"street\": \"Calle Alcala\",\n    \"number\": \"55\",\n    \"postal\": \"28009\",\n    \"city\": \"Madrid\",\n    \"province\": \"Madrid\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/project",
+              "host": ["{{baseUrl}}"],
+              "path": ["project"]
+            },
+            "description": "Creates a project linked to {{clientId}}. The returned _id is automatically saved to {{projectId}}."
+          }
+        },
+        {
+          "name": "List Projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/project?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["project"],
+              "query": [
+                { "key": "page",   "value": "1" },
+                { "key": "limit",  "value": "10" },
+                { "key": "client", "value": "{{clientId}}", "disabled": true },
+                { "key": "active", "value": "true", "disabled": true },
+                { "key": "sort",   "value": "-createdAt", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Project by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/project/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["project", "{{projectId}}"]
+            },
+            "description": "Returns the project with the client object fully populated via Mongoose .populate()."
+          }
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Reforma Oficina Central - Fase 2\",\n  \"notes\": \"Añadida fase de climatizacion\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/project/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["project", "{{projectId}}"]
+            }
+          }
+        },
+        {
+          "name": "Archive Project (Soft Delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/project/{{projectId}}?soft=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["project", "{{projectId}}"],
+              "query": [{ "key": "soft", "value": "true" }]
+            }
+          }
+        },
+        {
+          "name": "List Archived Projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/project/archived",
+              "host": ["{{baseUrl}}"],
+              "path": ["project", "archived"]
+            }
+          }
+        },
+        {
+          "name": "Restore Archived Project",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/project/{{projectId}}/restore",
+              "host": ["{{baseUrl}}"],
+              "path": ["project", "{{projectId}}", "restore"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delivery Notes",
+      "item": [
+        {
+          "name": "Create Delivery Note (Hours)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res._id) {",
+                  "  pm.collectionVariables.set('noteId', res._id);",
+                  "  console.log('noteId saved: ' + res._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client\": \"{{clientId}}\",\n  \"project\": \"{{projectId}}\",\n  \"format\": \"hours\",\n  \"description\": \"Instalacion de sistemas electricos planta 3\",\n  \"workDate\": \"2025-06-01\",\n  \"hours\": 8,\n  \"workers\": [\n    { \"name\": \"Carlos Lopez\", \"hours\": 4 },\n    { \"name\": \"Ana Martinez\", \"hours\": 4 }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/deliverynote",
+              "host": ["{{baseUrl}}"],
+              "path": ["deliverynote"]
+            },
+            "description": "Creates an hours-format delivery note. The _id is saved to {{noteId}}. A real-time Socket.IO event (deliverynote:new) is emitted to all users of the same company."
+          }
+        },
+        {
+          "name": "Create Delivery Note (Material)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client\": \"{{clientId}}\",\n  \"project\": \"{{projectId}}\",\n  \"format\": \"material\",\n  \"description\": \"Entrega de vigas de acero\",\n  \"workDate\": \"2025-06-02\",\n  \"material\": \"Viga de acero HEB-200\",\n  \"quantity\": 15,\n  \"unit\": \"unidades\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/deliverynote",
+              "host": ["{{baseUrl}}"],
+              "path": ["deliverynote"]
+            }
+          }
+        },
+        {
+          "name": "List Delivery Notes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/deliverynote?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["deliverynote"],
+              "query": [
+                { "key": "page",    "value": "1" },
+                { "key": "limit",   "value": "10" },
+                { "key": "project", "value": "{{projectId}}", "disabled": true },
+                { "key": "client",  "value": "{{clientId}}", "disabled": true },
+                { "key": "format",  "value": "hours", "disabled": true },
+                { "key": "signed",  "value": "false", "disabled": true },
+                { "key": "from",    "value": "2025-01-01", "disabled": true },
+                { "key": "to",      "value": "2025-12-31", "disabled": true },
+                { "key": "sort",    "value": "-workDate", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Delivery Note by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/deliverynote/{{noteId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["deliverynote", "{{noteId}}"]
+            },
+            "description": "Returns the delivery note with user, client, and project fully populated."
+          }
+        },
+        {
+          "name": "Sign Delivery Note",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"signatureData\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/deliverynote/{{noteId}}/sign",
+              "host": ["{{baseUrl}}"],
+              "path": ["deliverynote", "{{noteId}}", "sign"]
+            },
+            "description": "Signs the delivery note with a Base64 signature image. Once signed: the note is immutable (cannot be deleted or re-signed), the PDF is generated and stored on the server, and a deliverynote:signed Socket.IO event is emitted."
+          }
+        },
+        {
+          "name": "Download PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/deliverynote/pdf/{{noteId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["deliverynote", "pdf", "{{noteId}}"]
+            },
+            "description": "Streams the generated PDF for the signed delivery note. Only works after signing. In Postman, click 'Send and Download' to save the PDF file."
+          }
+        },
+        {
+          "name": "Delete Delivery Note (Unsigned Only)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/deliverynote/{{noteId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["deliverynote", "{{noteId}}"]
+            },
+            "description": "Deletes the note permanently. Returns 400 if the note has already been signed."
+          }
+        }
+      ]
+    }
+  ]
+}

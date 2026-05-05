@@ -1,15 +1,12 @@
-import { AppError } from '../utils/AppError.js';
+import AppError from '../utils/AppError.js';
 
-export const roleMiddleware = (...allowedRoles) => {
+const roleMiddleware = (...roles) => {
   return (req, res, next) => {
-    if (!req.user) {
-      return next(AppError.unauthorized('User not authenticated'));
+    if (!roles.includes(req.user.role)) {
+      return next(AppError.forbidden('Access denied'));
     }
-
-    if (!allowedRoles.includes(req.user.role)) {
-      return next(AppError.forbidden('You do not have permission to perform this action'));
-    }
-
     next();
   };
 };
+
+export default roleMiddleware;

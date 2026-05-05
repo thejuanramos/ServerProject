@@ -1,31 +1,23 @@
 import { Router } from 'express';
 import * as clientController from '../controllers/client.controller.js';
-import { authMiddleware as auth } from '../middleware/auth.middleware.js';
-import { validate } from '../middleware/validate.js';
-import { createClientSchema } from '../validators/client.validator.js';
+import auth from '../middleware/auth.middleware.js';
+import validate from '../middleware/validate.js';
+import { createClientSchema, updateClientSchema } from '../validators/client.validator.js';
 
 const router = Router();
 
-// POST /api/client -> Create a new client
-router.post(
-  '/', 
-  auth, 
-  validate(createClientSchema), 
-  clientController.createClient
-);
+router.use(auth); // All client routes require auth
 
-// GET /api/client -> Get all clients for the logged-in user's company
-router.get(
-  '/', 
-  auth, 
-  clientController.getClients
-);
+router.get('/archived', clientController.getArchivedClients);
+router.patch('/:id/restore', clientController.restoreClient);
 
-// GET /api/client/:id -> Get a single client by ID
-router.get(
-  '/:id', 
-  auth, 
-  clientController.getClientById
-);
+router.route('/')
+  .post(validate(createClientSchema), clientController.createClient)
+  .get(clientController.getClients);
+
+router.route('/:id')
+  .get(clientController.getClientById)
+  .put(validate(updateClientSchema), clientController.updateClient)
+  .delete(clientController.deleteClient);
 
 export default router;

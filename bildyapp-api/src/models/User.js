@@ -64,4 +64,6 @@ userSchema.pre('save', async function(next) {
   next();
 });
 
-export default model('User', userSchema);
+// FIXED LINE: Use 'model' instead of 'mongoose.model'
+const User = model('User', userSchema);
+export default User;

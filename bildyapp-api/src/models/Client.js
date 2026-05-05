@@ -1,19 +1,57 @@
 import { Schema, model } from 'mongoose';
 
-const clientSchema = new Schema({
-  name: { type: String, required: true },
-  cif: { type: String, required: true, unique: true },
-  address: {
-    street: { type: String },
-    number: { type: String },
-    postal: { type: String },
-    city: { type: String },
-    province: { type: String }
+const clientSchema = new Schema(
+  {
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    company: {
+      type: Schema.Types.ObjectId,
+      ref: 'Company',
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    cif: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+    },
+    phone: {
+      type: String,
+      trim: true,
+    },
+    address: {
+      street: String,
+      number: String,
+      postal: String,
+      city: String,
+      province: String,
+    },
+    deleted: {
+      type: Boolean,
+      default: false,
+    },
   },
-  // This links the client to the person who created it
-  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  // This links the client to your company
-  companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true }
-}, { timestamps: true });
+  {
+    timestamps: true,
+  }
+);
 
-export default model('Client', clientSchema);
+// Compound index to ensure unique CIF per company
+clientSchema.index({ company: 1, cif: 1 }, { unique: true });
+
+const Client = model('Client', clientSchema);
+
+export default Client;

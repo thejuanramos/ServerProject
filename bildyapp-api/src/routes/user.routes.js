@@ -13,10 +13,10 @@ import {
   changePassword,
   inviteUser,
 } from '../controllers/user.controller.js';
-import { authMiddleware } from '../middleware/auth.middleware.js';
-import { roleMiddleware } from '../middleware/role.middleware.js';
+import authMiddleware from '../middleware/auth.middleware.js'; 
+import roleMiddleware from '../middleware/role.middleware.js';
 import { upload } from '../middleware/upload.js';
-import { validate } from '../middleware/validate.js';
+import validate  from '../middleware/validate.js';
 import {
   registerSchema,
   emailValidationSchema,
@@ -34,12 +34,7 @@ const router = Router();
 router.post('/register', validate(registerSchema), registerUser);
 
 // 2) Email validation (requires access token from register/login)
-router.put(
-  '/validation',
-  authMiddleware,
-  validate(emailValidationSchema),
-  validateEmail,
-);
+router.put('/validation', validateEmail);
 
 // 3) Login
 router.post('/login', validate(loginSchema), loginUser);

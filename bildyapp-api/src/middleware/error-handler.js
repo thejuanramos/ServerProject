@@ -1,16 +1,25 @@
-const errorHandler = (err, req, res, next) => {
-  console.error(err);
+import { sendSlackNotification } from '../services/slack.service.js';
 
-  if (err.isOperational) {
-    return res.status(err.statusCode).json({
-      error: true,
-      message: err.message,
-    });
+const errorHandler = (err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+  const message = err.message || 'Internal Server Error';
+
+  // Log to console for development
+  if (process.env.NODE_ENV !== 'test') {
+    console.error(`[Error] ${statusCode} - ${message}`);
   }
 
-  return res.status(500).json({
-    error: true,
-    message: 'Internal server error',
+  // If it's a 500 error, notify Slack
+  if (statusCode === 500) {
+    sendSlackNotification(err, req);
+  }
+
+  res.status(statusCode).json({
+    status: 'error',
+    statusCode,
+    message,
+    // Only show stack trace in development mode
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 };
 

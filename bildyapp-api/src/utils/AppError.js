@@ -1,31 +1,36 @@
-export class AppError extends Error {
+class AppError extends Error {
   constructor(message, statusCode) {
     super(message);
     this.statusCode = statusCode;
+    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
     this.isOperational = true;
+
+    Error.captureStackTrace(this, this.constructor);
   }
 
-  static badRequest(msg = 'Bad request') {
-    return new AppError(msg, 400);
+  static badRequest(msg) {
+    return new AppError(msg || 'Bad Request', 400);
   }
 
-  static unauthorized(msg = 'Unauthorized') {
-    return new AppError(msg, 401);
+  static unauthorized(msg) {
+    return new AppError(msg || 'Unauthorized', 401);
   }
 
-  static forbidden(msg = 'Forbidden') {
-    return new AppError(msg, 403);
+  static forbidden(msg) {
+    return new AppError(msg || 'Forbidden', 403);
   }
 
-  static notFound(msg = 'Not found') {
-    return new AppError(msg, 404);
+  static notFound(msg) {
+    return new AppError(msg || 'Not Found', 404);
   }
 
-  static conflict(msg = 'Conflict') {
-    return new AppError(msg, 409);
+  static conflict(msg) {
+    return new AppError(msg || 'Conflict', 409);
   }
 
-  static tooMany(msg = 'Too many requests') {
-    return new AppError(msg, 429);
+  static internal(msg) {
+    return new AppError(msg || 'Internal Server Error', 500);
   }
 }
+
+export default AppError;

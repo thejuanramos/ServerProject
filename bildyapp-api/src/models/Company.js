@@ -1,27 +1,33 @@
 import mongoose from 'mongoose';
 
-const addressSchema = new mongoose.Schema(
-  {
+const companySchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, 'Company name is required'],
+    trim: true
+  },
+  cif: {
+    type: String,
+    required: [true, 'CIF is required'],
+    unique: true,
+    trim: true
+  },
+  address: {
     street: String,
-    number: String,
-    postal: String,
+    number: Number,
+    postalCode: String,
     city: String,
-    province: String,
+    province: String
   },
-  { _id: false }
-);
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }
+}, {
+  timestamps: true
+});
 
-const companySchema = new mongoose.Schema(
-  {
-    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    name: String,
-    cif: String,
-    address: addressSchema,
-    logo: String,
-    isFreelance: { type: Boolean, default: false },
-    deleted: { type: Boolean, default: false },
-  },
-  { timestamps: true }
-);
+const Company = mongoose.model('Company', companySchema);
 
-export const Company = mongoose.model('Company', companySchema);
+export default Company;

@@ -1,6 +1,8 @@
 import { ZodError } from 'zod';
+import AppError from '../utils/AppError.js';
 
-export const validate = (schema) => async (req, res, next) => {
+// Define the function
+const validate = (schema) => async (req, res, next) => {
   try {
     const parsed = await schema.parseAsync({
       body: req.body,
@@ -15,17 +17,17 @@ export const validate = (schema) => async (req, res, next) => {
     next();
   } catch (error) {
     if (error instanceof ZodError) {
-      return res.status(400).json({
-        error: true,
-        message: 'Validation error',
-        code: 'VALIDATION_ERROR',
-        details: error.errors.map((err) => ({
-          field: err.path.join('.'),
-          message: err.message,
-        })),
-      });
+      const detailMessage = error.errors
+        .map((err) => `${err.path.join('.')}: ${err.message}`)
+        .join(', ');
+      
+      return next(AppError.badRequest(`Validation failed: ${detailMessage}`));
     }
-
     next(error);
   }
 };
+
+export { validate }; 
+
+// This satisfies 'import validate'
+export default validate;

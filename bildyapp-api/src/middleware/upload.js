@@ -1,7 +1,7 @@
 import multer from 'multer';
 import fs from 'node:fs';
 import path from 'node:path';
-import { AppError } from '../utils/AppError.js';
+import AppError from '../utils/AppError.js';
 
 const uploadDir = path.resolve('uploads');
 

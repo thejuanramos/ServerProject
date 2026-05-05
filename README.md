@@ -33,65 +33,82 @@ Backend REST API for managing construction delivery notes between companies, cli
 
 ---
 
-## Setup
+# Setup
 
-### 1. Clone and install
+# 1. Clone and install
 
 ```bash
 git clone <repository-url>
 cd bildyapp-api
 npm install
+```
 
-### 2. Configure environment variables
+# 2. Configure environment variables
 Copy the example file and fill in your values:
 
+```bash
 cp .env.example .env
+```
 Open .env and set the following:
-
+```bash
 PORT=3000
+```
 
-# MongoDB Atlas connection string
-# Get this from: Atlas dashboard → Connect → Drivers → Node.js
+## MongoDB Atlas connection string
+### Get this from: Atlas dashboard → Connect → Drivers → Node.js
+```bash
 DBURI=mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/bildyapp?retryWrites=true&w=majority
+```
 
-# Secret key for signing JWT tokens — any long random string works
+### Secret key for signing JWT tokens — any long random string works
+```bash
 JWT_SECRET=your_super_secret_key_here_make_it_long
+```
 
-# Email credentials (Mailtrap recommended for testing, Gmail for production)
+### Email credentials (Mailtrap recommended for testing, Gmail for production)
+```bash
 EMAIL_HOST=smtp.mailtrap.io
 EMAIL_PORT=587
 EMAIL_USER=your_mailtrap_user
 EMAIL_PASS=your_mailtrap_password
-
-# Slack webhook URL for 5XX error alerts (optional)
-# Create one at: api.slack.com/apps → Incoming Webhooks
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz
-
+```
+```bash
 NODE_ENV=development
+```
 
-### 3. Set up MongoDB Atlas
+# 3. Set up MongoDB Atlas
 Go to cloud.mongodb.com and create a free account
 Create a new Free Tier cluster (M0)
 Under Database Access, create a user with read/write permissions
 Under Network Access, add 0.0.0.0/0 to allow connections from anywhere
 Click Connect → Drivers → Node.js and copy the connection string into DBURI
 Running the server
-# Development (auto-restarts on changes)
+### Development (auto-restarts on changes)
+```bash
 npm run dev
+```
 
 # Production
+```bash
 npm start
+```
 The server starts at http://localhost:3000.
 
 Running the tests
-# Run all tests
+### Run all tests
+```bash
 npm test
+```
 
-# Run tests with coverage report
+### Run tests with coverage report
+```bash
 npm run test:coverage
+```
 
-# Watch mode (re-runs on file changes)
+### Watch mode (re-runs on file changes)
+```bash
 npm run test:watch
+```
 Test results
 The test suite covers 34 integration tests across 4 test files:
 
@@ -107,8 +124,10 @@ All files  |  72.59% Stmts  |  76.92% Lines
 Passes the ≥70% requirement. Tests run against an isolated in-memory MongoDB instance (mongodb-memory-server) — no real database is touched during testing.
 API Documentation (Swagger)
 With the server running, open:
-
+```bash
 http://localhost:3000/api-docs
+```
+
 The interactive Swagger UI documents all endpoints with:
 
 Request body schemas and examples
@@ -117,7 +136,7 @@ All possible response codes (200, 201, 400, 401, 404, 409)
 Built-in "Try it out" for manual testing directly from the browser
 You can authorize with your JWT token by clicking the Authorize button (top right) and entering <your_token>.
 
-### Manual testing with Postman
+# Manual testing with Postman
 Step 1: Import the collection
 Open Postman
 Click Import → drag and drop postman/BildyApp_API.postman_collection.json
@@ -216,44 +235,41 @@ Exceeding this returns: 429 Too Many Requests
 
 Remove the Bearer token from any protected request (e.g., GET /api/client)
 Expected: 401 Unauthorized
-Project structure
-bildyapp-api/
-├── src/
-│   ├── config/
-│   │   ├── index.js          # MongoDB connection
-│   │   └── swagger.js        # OpenAPI 3.0 spec
-│   ├── controllers/          # Business logic (MVC pattern)
-│   ├── middleware/
-│   │   ├── auth.middleware.js # JWT verification
-│   │   ├── error-handler.js  # Centralized error handling + Slack alerts
-│   │   ├── rate-limit.js     # 100 req / 15 min
-│   │   ├── sanitize.js       # NoSQL injection prevention
-│   │   └── validate.js       # Zod schema validation
-│   ├── models/               # Mongoose schemas
-│   ├── routes/               # Express routers
-│   ├── services/
-│   │   ├── mail.service.js   # Email sending (Nodemailer)
-│   │   ├── pdf.service.js    # PDF generation (PDFKit)
-│   │   └── slack.service.js  # 5XX error alerts
-│   ├── utils/AppError.js     # Typed HTTP error class
-│   ├── validators/           # Zod validation schemas
-│   ├── app.js                # Express + Socket.IO setup
-│   └── index.js              # Entry point
-├── tests/
-│   ├── setup.js              # mongodb-memory-server helpers
-│   ├── helpers.js            # Token + company setup utilities
-│   ├── auth.test.js
-│   ├── client.test.js
-│   ├── project.test.js
-│   └── deliverynote.test.js
-├── postman/
-│   └── BildyApp_API.postman_collection.json
-├── .env.example
-├── jest.config.js
-└── package.json
-Key design decisions
+
+
+# Project structure
+<img width="519" height="704" alt="image" src="https://github.com/user-attachments/assets/4ad8a62a-421b-4a36-adc5-4712f86a3be6" />
+
+
+# Key design decisions
+
 Company-scoped data: clients, projects, and delivery notes belong to a company, not just a user. Any user from the same company can access shared resources.
+
 Soft delete by default: archiving sets deleted: true rather than removing the document, allowing recovery.
+
 Immutable signed notes: once a delivery note is signed, it cannot be modified or deleted — the signature and PDF are permanent.
+
 Real-time via Socket.IO rooms: events are only emitted to users in the same company room, identified by company._id.
+
 Test isolation: every test runs against a fresh in-memory MongoDB instance, with all collections cleared between tests.
+
+<br>
+</br>
+
+<div align="right">
+
+**Juan Alejandro Ramos Quintás**  
+*Web Development II, Server (2602_INSG3_PW2S_A)*
+
+
+</div>
+
+<br>
+</br>
+<br>
+</br>
+
+<div align="center">
+<img width="500" alt="image" src="https://github.com/user-attachments/assets/9c11fe3e-4a9d-4fac-af79-b22a29050066" />
+
+</div>

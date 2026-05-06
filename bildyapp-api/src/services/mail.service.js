@@ -11,12 +11,10 @@ const transporter = nodemailer.createTransport({
 });
 
 export const sendVerificationEmail = async (email, code) => {
-  // --- ADD THIS BLOCK ---
   if (process.env.NODE_ENV === 'test') {
     console.log(`[TEST MODE] Skipping real email for ${email}. Code: ${code}`);
     return true; 
   }
-  // ----------------------
 
   const mailOptions = {
     from: `"BildyApp Support" <${process.env.EMAIL_USER}>`,

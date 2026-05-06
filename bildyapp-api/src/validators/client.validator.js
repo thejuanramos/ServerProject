@@ -18,7 +18,6 @@ export const createClientSchema = z.object({
   body: z.object(clientBody)
 });
 
-// For PUT requests, we make the fields optional so you can update just a few
 export const updateClientSchema = z.object({
   body: z.object(clientBody).partial()
 });

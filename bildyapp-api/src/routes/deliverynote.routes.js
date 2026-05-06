@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as dnController from '../controllers/deliverynote.controller.js';
-import authMiddleware from '../middleware/auth.middleware.js'; // Using the name that matches your file
+import authMiddleware from '../middleware/auth.middleware.js'; 
 import validate from '../middleware/validate.js';
 import { createDeliveryNoteSchema } from '../validators/deliverynote.validator.js';
 

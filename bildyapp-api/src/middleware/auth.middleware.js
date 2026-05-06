@@ -23,5 +23,4 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-// This MUST be export default to match your user.routes.js
 export default authMiddleware;
